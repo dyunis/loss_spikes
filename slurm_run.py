@@ -184,7 +184,7 @@ def add_args(parser):
     parser.add_argument('--mail_type', type=str, default='FAIL')
     parser.add_argument('-a', '--array', type=int, help='number of array jobs to run in parallel')
     parser.add_argument('--wandb_dir', type=str, default='/share/data/speech/Data/dyunis/exps/wandb', help='default wandb directory')
-    parser.add_argument('--working_dir', type=str, default='/home-nfs/dyunis/lmc_svd/language_modeling', help='default working directory')
+    parser.add_argument('--working_dir', type=str, default='/home-nfs/dyunis/loss_spikes', help='default working directory')
     return parser
 
 

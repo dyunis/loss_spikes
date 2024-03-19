@@ -1,11 +1,11 @@
-program: /home-nfs/dyunis/lmc_svd/language_modeling/run.py
+program: run.py
 command:
   - ${env}
   - ${interpreter}
   - ${program}
 method: grid
-project: lmc_svd
-name: loss_spike_language_tfmr_wikitext
+project: loss_spikes
+name: language_tfmr_wikitext
 metric:
   name: val/loss
   goal: minimize
