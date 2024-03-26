@@ -119,7 +119,7 @@ def make_sbatch_script(wandb_dir, wandb_project, wandb_group, wandb_name, wandb_
         f'#SBATCH --dependency={sbatch_args["dependency"]}',
         f'#SBATCH --partition={sbatch_args["partition"]}',
         f'#SBATCH --cpus-per-task={num_cores}',
-        f'#SBATCH --ntasks-per-node={num_cores}',  # supposedly needs to match for lightning, but our cluster only allows 1
+        f'#SBATCH --ntasks-per-node=1',  # supposedly needs to match for lightning, but our cluster only allows 1
         f'#SBATCH --nodes=1',  # our cluster doesn't support multi-node training
     ]
 
