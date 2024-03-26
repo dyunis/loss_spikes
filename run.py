@@ -7,6 +7,8 @@ import pickle
 import time
 
 import lightning.pytorch as pl
+from lightning.pytorch.plugins.environments import LightningEnvironment, SLURMEnvironment
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
 import numpy as np
 import torch
 
@@ -47,24 +49,26 @@ def main(config, savedir):
     seeder = callbacks.PlSeedCallback(config.seed)
     time_str = timedelta_to_str(timedelta(seconds=time_left))
     slurm_timer = callbacks.PlSlurmTimer(duration=time_str)
+    callback = [seeder, slurm_timer]
 
-    saver = callbacks.ModelCheckpoint(
-        dirpath=savedir,
-        save_last=True,
-        save_on_train_epoch_end=True,
-        save_top_k=-1,
-        every_n_epochs=config.save_interval,  # but only at certain interval
-    )
-    callback = [seeder, saver, slurm_timer]
+    if rank_zero_only.rank == 0:
+        saver = callbacks.ModelCheckpoint(
+            dirpath=savedir,
+            save_last=True,
+            save_on_train_epoch_end=True,
+            save_top_k=-1,
+            every_n_epochs=config.save_interval,  # but only at certain interval
+        )
+        callback.append(saver)
 
-    if config.use_wandb:
+    if config.use_wandb and rank_zero_only.rank == 0:
         from callbacks import PlWandbEvaluator
         train_evaluator = PlWandbEvaluator(model, eval_train_loader, config, split='train')
         val_evaluator = PlWandbEvaluator(model, val_loader, config, split='val')
         callback.extend([train_evaluator, val_evaluator])
 
     # plot svs over time
-    if config.plot_svs:
+    if config.plot_svs and rank_zero_only.rank == 0:
         from callbacks import PlSVComputer
         sv_computer = PlSVComputer(config)
         callback.append(sv_computer)
@@ -75,6 +79,14 @@ def main(config, savedir):
         callback.append(perturber)
 
     assert config.num_gpus > 0
+
+    # we want to manually launch multigpu, not let sbatch handle it
+    # see https://github.com/Lightning-AI/pytorch-lightning/issues/18650#issuecomment-1747669666
+    plugins = None
+    if SLURMEnvironment.detect():
+        print('detected slurm env (likely launched via sbatch), using lightning env to allow multigpu')
+        plugins = [LightningEnvironment()]
+
     trainer = pl.Trainer(
         max_epochs=config.num_epochs,
         accelerator='gpu',
@@ -169,7 +181,7 @@ def pl_ckpt_path_to_step(ckpt_path):
 
 if __name__=='__main__':
     from config import config, setup_wandb
-    if config.use_wandb:
+    if config.use_wandb and rank_zero_only.rank == 0:
         import wandb
         config, wandb_dir, wandb_name, wandb_id, savedir = setup_wandb(config)
     else:
@@ -180,5 +192,5 @@ if __name__=='__main__':
     except TimeoutError as e:
         print(str(e))  # otherwise clogs emails with slurm timeouts
     finally:
-        if config.use_wandb:
+        if config.use_wandb and rank_zero_only.rank == 0:
             wandb.finish()
